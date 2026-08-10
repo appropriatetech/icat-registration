@@ -1,0 +1,7 @@
+# Agent configuration
+.agent/
+.claude/
+.github/instructions/
+.github/prompts/
+.github/skills/
+.github/copilot-instructions.md
