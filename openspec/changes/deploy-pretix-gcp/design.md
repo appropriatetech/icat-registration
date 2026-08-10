@@ -90,11 +90,14 @@ Both mounts use `uid=15371, gid=15371` to match the Pretix container user.
 - Filestore (NFS) — minimum 1 TB, absurdly over-provisioned for config + a few PDFs
 - Passing config entirely via environment variables — Pretix supports `PRETIX_SECTION_KEY` env vars, but this would result in dozens of env vars and would diverge from the OJS config-file pattern
 
-### 5. Container image: Use upstream `pretix/standalone` directly
+### 5. Container image & web server process entrypoint
 
-**Decision**: Use the official `pretix/standalone` image pinned to a specific version tag. No custom Dockerfile.
+**Decision**: Use the official `pretix/standalone` image pinned to a specific version tag. To ensure static files under `/static/` (JS, CSS, SVGs) are served alongside dynamic Python routes, invoke the container with the `web` entrypoint argument (`args = ["web"]`), which launches both Nginx and Gunicorn inside the container.
 
-**Rationale**: Unlike OJS (which required a custom image for GCS FUSE compatibility, email relay scripts, and PHP config), Pretix's Docker image is designed for standalone deployment. All configuration is external (config file + env vars). No custom code injection is needed.
+**Alternatives considered**:
+- Running bare Gunicorn directly (`command = ["gunicorn"]`) — Gunicorn only handles dynamic Django views and returns 404 for all `/static/` assets.
+- Sidecar Nginx container — If the `web` entrypoint's internal supervisord fails on Cloud Run due to `no-new-privileges` / `sudo` restrictions, add an Nginx sidecar container in the Cloud Run service spec serving `/static/` from an in-memory volume.
+- Cloud CDN + GCS bucket for static assets — Requires a Cloud Load Balancer ($18+/mo baseline) and static asset collection scripts on every upgrade. Overkill for a small conference.
 
 **Upgrade path**: Update the image tag in `main.tf` and run `tofu apply`. Pretix auto-migrates on startup.
 

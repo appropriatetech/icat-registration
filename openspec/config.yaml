@@ -1,4 +1,13 @@
 schema: spec-driven
+context: |
+  Tech stack: OpenTofu
+  We use conventional commits
+  Domain: non-profit appropriate technology organization conference & workshop registration platform
+operations:
+  apply:
+    guidance:
+      - Run `tofu plan` before `tofu apply` to preview changes. Use `-concise` to cut down on verbosity.
+      - As long as there are only resources from the current OpenTofu project being affected, you can use the `-auto-approve` flag for `tofu apply` to skip the confirmation prompt.
 
 # Project context (optional)
 # This is shown to AI when creating artifacts.

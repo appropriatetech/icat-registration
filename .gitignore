@@ -5,3 +5,9 @@
 .github/prompts/
 .github/skills/
 .github/copilot-instructions.md
+
+# OpenTofu / Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.auto.tfvars

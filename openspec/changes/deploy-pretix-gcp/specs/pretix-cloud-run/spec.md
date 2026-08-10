@@ -66,3 +66,15 @@ The system SHALL configure the Cloud Run service with CPU throttling enabled (`c
 #### Scenario: Service scales to zero when idle
 - **WHEN** no HTTP requests are received for the configured idle period
 - **THEN** Cloud Run scales the service to zero instances
+
+### Requirement: Static asset serving via Nginx
+The system SHALL serve static assets (JavaScript, CSS, images under `/static/`) with HTTP 200 responses, using the Nginx server bundled inside the `pretix/standalone` image. The container SHALL be started with the `web` entrypoint argument, which launches both Nginx (for static files) and Gunicorn (for dynamic requests) via supervisord, rather than running bare Gunicorn directly.
+
+#### Scenario: Static files load successfully
+- **WHEN** a client requests a static asset such as `/static/pretixcontrol/js/auth.*.js`, `/static/CACHE/css/*.css`, or `/static/pretixbase/img/pretix-logo.*.svg`
+- **THEN** the server returns HTTP 200 with the correct content type and file payload
+
+#### Scenario: Fallback if supervisord is blocked by Cloud Run security
+- **GIVEN** the `web` entrypoint invokes `sudo` to start supervisord, which may be blocked by Cloud Run's `no-new-privileges` security policy
+- **WHEN** the `web` entrypoint fails to start
+- **THEN** the system SHALL fall back to a sidecar architecture: a separate Nginx container serves `/static/` from a shared volume, and the primary container runs bare Gunicorn for dynamic requests
