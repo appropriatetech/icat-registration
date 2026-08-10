@@ -5,6 +5,8 @@
 - [x] 1.3 Create `tf/prod/.auto.tfvars` with SMTP credential values (add to `.gitignore`)
 - [x] 1.4 Create `tf/prod/main.tf` with `locals` block defining `project_id = "inat-359418"`, `region = "us-central1"`, and Pretix-specific environment value maps
 - [x] 1.5 Ensure `.gitignore` excludes `.auto.tfvars`, `.terraform/`, and `*.tfstate*`
+- [x] 1.6 Update Pretix image tag variable default to `2026.7.0` in `variables.tf`
+- [x] 1.7 Add `pretix_smtp_host`, `pretix_smtp_port`, `pretix_smtp_use_tls`, `pretix_smtp_use_ssl` variables in `variables.tf`
 
 ## 2. GCP API Enablement
 
@@ -35,6 +37,8 @@
 - [x] 6.2 Add `google_storage_bucket` resource `icat-pretix-data` — for persistent Pretix data (media, PDFs, uploads), 7-day soft delete policy
 - [x] 6.3 Create `tf/prod/config/pretix.cfg` template with `templatefile()` variables for all `[pretix]`, `[database]`, `[redis]`, `[django]`, and `[mail]` sections — using `${variable_name}` syntax for substitution
 - [x] 6.4 Add `google_storage_bucket_object` resource to upload the rendered `pretix.cfg` to the config bucket
+- [x] 6.5 Add `tf/prod/config/nginx.conf` template file and `google_storage_bucket_object` resource to upload `nginx.conf` to `icat-pretix-config`
+- [x] 6.6 Update `tf/prod/config/pretix.cfg` template and `main.tf` rendering call to use `${mail_host}`, `${mail_port}`, `${mail_use_tls}`, and `${mail_use_ssl}`
 
 ## 7. Service Account and IAM
 
@@ -61,6 +65,7 @@
 - [x] 9.8 Set the Cloud Run service to allow unauthenticated access (public registration form)
 - [x] 9.9 Add `google_cloud_run_domain_mapping` resource for `register.appropriatetech.net`
 - [x] 9.10 Update Cloud Run service container command/args to use `pretix web` (Nginx + Gunicorn) for static asset serving
+- [x] 9.11 Test container startup using default `args = ["web"]` on `2026.7.0`, falling back to `/etc/pretix/nginx.conf` if needed
 
 ## 10. Scheduled Tasks (Cloud Run Job + Cloud Scheduler)
 
@@ -83,3 +88,5 @@
 - [x] 12.7 Create the initial Pretix admin superuser via `gcloud run jobs execute` or `gcloud run services exec` running `pretix createsuperuser`
 - [x] 12.8 Access `register.appropriatetech.net` and verify the Pretix admin interface loads
 - [x] 12.9 Verify static assets (`/static/pretixcontrol/js/...`, `/static/CACHE/css/...`, `/static/pretixbase/img/...`) return HTTP 200
+- [x] 12.10 Verify site and static assets load on Pretix version `2026.7.0`
+- [x] 12.11 Verify email sending functionality (e.g. admin email change confirmation) with `smtp.gmail.com`

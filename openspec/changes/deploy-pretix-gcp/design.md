@@ -92,14 +92,21 @@ Both mounts use `uid=15371, gid=15371` to match the Pretix container user.
 
 ### 5. Container image & web server process entrypoint
 
-**Decision**: Use the official `pretix/standalone` image pinned to a specific version tag. To ensure static files under `/static/` (JS, CSS, SVGs) are served alongside dynamic Python routes, invoke the container with the `web` entrypoint argument (`args = ["web"]`), which launches both Nginx and Gunicorn inside the container.
+**Decision**: Use the official `pretix/standalone` image pinned to a specific version tag (`2026.7.0`). First test the standard container `web` entrypoint (`args = ["web"]`). To ensure static files under `/static/` (JS, CSS, SVGs) are served alongside dynamic Python routes, invoke the container with the `web` entrypoint argument (`args = ["web"]`), which launches both Nginx and Gunicorn inside the container. If supervisord/sudo restrictions on Cloud Run block `web`, execute Nginx with an OpenTofu-managed `config/nginx.conf` template file uploaded to the `icat-pretix-config` GCS bucket (mounted at `/etc/pretix/nginx.conf`) alongside Gunicorn.
 
 **Alternatives considered**:
 - Running bare Gunicorn directly (`command = ["gunicorn"]`) — Gunicorn only handles dynamic Django views and returns 404 for all `/static/` assets.
+- Inline shell string generation with `cat << EOF` — fragile, hard to read, and difficult to maintain compared to an OpenTofu-managed template file in GCS.
 - Sidecar Nginx container — If the `web` entrypoint's internal supervisord fails on Cloud Run due to `no-new-privileges` / `sudo` restrictions, add an Nginx sidecar container in the Cloud Run service spec serving `/static/` from an in-memory volume.
 - Cloud CDN + GCS bucket for static assets — Requires a Cloud Load Balancer ($18+/mo baseline) and static asset collection scripts on every upgrade. Overkill for a small conference.
 
 **Upgrade path**: Update the image tag in `main.tf` and run `tofu apply`. Pretix auto-migrates on startup.
+
+### 6. SMTP Email Server Endpoint Configuration
+
+**Decision**: Parameterize the `[mail]` section of `pretix.cfg` using OpenTofu variables (`pretix_smtp_host`, `pretix_smtp_port`, `pretix_smtp_use_tls`, `pretix_smtp_use_ssl`) defaulting to `smtp.gmail.com` on port 587 with STARTTLS (`tls = on`).
+
+**Rationale**: `smtp-relay.gmail.com` requires fixed IP whitelist configuration in Google Workspace Admin. `smtp.gmail.com` allows standard password/App Password authentication across Cloud Run's dynamic IP range without connection drops.
 
 ### 6. Scheduled tasks: Cloud Run Job + Cloud Scheduler
 

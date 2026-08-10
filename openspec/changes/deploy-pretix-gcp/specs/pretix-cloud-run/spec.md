@@ -67,14 +67,18 @@ The system SHALL configure the Cloud Run service with CPU throttling enabled (`c
 - **WHEN** no HTTP requests are received for the configured idle period
 - **THEN** Cloud Run scales the service to zero instances
 
-### Requirement: Static asset serving via Nginx
-The system SHALL serve static assets (JavaScript, CSS, images under `/static/`) with HTTP 200 responses, using the Nginx server bundled inside the `pretix/standalone` image. The container SHALL be started with the `web` entrypoint argument, which launches both Nginx (for static files) and Gunicorn (for dynamic requests) via supervisord, rather than running bare Gunicorn directly.
+### Requirement: Static asset serving via Nginx configuration file
+The system SHALL serve static assets (JavaScript, CSS, images under `/static/`) with HTTP 200 responses. The system SHALL first attempt running the standard `web` container argument (`args = ["web"]`). If custom Nginx execution is required on Cloud Run, the Nginx configuration SHALL be rendered from an OpenTofu template file (`config/nginx.conf`), uploaded to the `icat-pretix-config` bucket, and mounted read-only at `/etc/pretix/nginx.conf`.
 
 #### Scenario: Static files load successfully
 - **WHEN** a client requests a static asset such as `/static/pretixcontrol/js/auth.*.js`, `/static/CACHE/css/*.css`, or `/static/pretixbase/img/pretix-logo.*.svg`
-- **THEN** the server returns HTTP 200 with the correct content type and file payload
-
-#### Scenario: Fallback if supervisord is blocked by Cloud Run security
 - **GIVEN** the `web` entrypoint invokes `sudo` to start supervisord, which may be blocked by Cloud Run's `no-new-privileges` security policy
 - **WHEN** the `web` entrypoint fails to start
 - **THEN** the system SHALL fall back to a sidecar architecture: a separate Nginx container serves `/static/` from a shared volume, and the primary container runs bare Gunicorn for dynamic requests
+
+### Requirement: Configurable SMTP Mail Delivery
+The system SHALL support configurable SMTP parameters (`pretix_smtp_host`, `pretix_smtp_port`, `pretix_smtp_use_tls`, `pretix_smtp_use_ssl`) in OpenTofu, defaulting to `smtp.gmail.com:587` with STARTTLS enabled to support standard Gmail and Google Workspace App Passwords without connection termination.
+
+#### Scenario: Mail delivery via STARTTLS on port 587
+- **WHEN** Pretix sends a confirmation or notification email
+- **THEN** the system connects to `smtp.gmail.com:587`, initiates STARTTLS, authenticates with the provided credentials, and sends the message successfully.

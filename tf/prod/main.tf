@@ -189,10 +189,21 @@ resource "google_storage_bucket_object" "pretix_cfg" {
     redis_host    = google_redis_instance.inat_redis.host
     redis_port    = google_redis_instance.inat_redis.port
     django_secret = random_password.pretix_django_secret.result
-    mail_from     = var.pretix_smtp_user
+    mail_from     = coalesce(var.pretix_sender_email, var.pretix_smtp_user)
+    mail_host     = var.pretix_smtp_host
     mail_user     = var.pretix_smtp_user
     mail_password = var.pretix_smtp_pass
+    mail_port     = var.pretix_smtp_port
+    mail_tls      = var.pretix_smtp_use_tls
+    mail_ssl      = var.pretix_smtp_use_ssl
   })
+}
+
+resource "google_storage_bucket_object" "nginx_conf" {
+  name   = "nginx.conf"
+  bucket = google_storage_bucket.icat_pretix_config.name
+
+  content = file("${path.module}/config/nginx.conf")
 }
 
 # ------------------------------------------------------------------------------
@@ -279,7 +290,7 @@ resource "google_cloud_run_v2_service" "icat_pretix" {
     containers {
       image   = "pretix/standalone:${var.pretix_image_tag}"
       command = ["/bin/bash"]
-      args    = ["-c", "cat << 'EOF' > /tmp/nginx.conf\ndaemon off;\nevents { worker_connections 1024; }\nhttp {\n    include /etc/nginx/mime.types;\n    default_type application/octet-stream;\n    sendfile on;\n    client_max_body_size 100M;\n    client_body_temp_path /tmp/nginx_body;\n    proxy_temp_path /tmp/nginx_proxy;\n    fastcgi_temp_path /tmp/nginx_fastcgi;\n    uwsgi_temp_path /tmp/nginx_uwsgi;\n    scgi_temp_path /tmp/nginx_scgi;\n    server {\n        listen 80;\n        server_name _;\n        location /static/ {\n            alias /pretix/src/pretix/static.dist/;\n            expires 30d;\n            add_header Cache-Control \"public\";\n        }\n        location /media/ {\n            alias /data/media/;\n            expires 7d;\n            add_header Cache-Control \"public\";\n        }\n        location / {\n            proxy_pass http://unix:/tmp/pretix.sock;\n            proxy_set_header Host $http_host;\n            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;\n            proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;\n        }\n    }\n}\nEOF\ngunicorn pretix.wsgi --bind unix:/tmp/pretix.sock --workers 2 --name pretix &\nexec nginx -c /tmp/nginx.conf -g 'pid /tmp/nginx.pid;'"]
+      args    = ["-c", "gunicorn pretix.wsgi --bind unix:/tmp/pretix.sock --workers 2 --name pretix & exec nginx -c /etc/pretix/nginx.conf"]
 
       ports {
         container_port = 80
@@ -292,6 +303,14 @@ resource "google_cloud_run_v2_service" "icat_pretix" {
         }
         cpu_idle          = true
         startup_cpu_boost = true
+      }
+
+      env {
+        name  = "PRETIX_CONFIG_VERSION"
+        value = jsonencode({
+          pretix_cfg = google_storage_bucket_object.pretix_cfg.md5hash
+          nginx_conf = google_storage_bucket_object.nginx_conf.md5hash
+        })
       }
 
       env {
@@ -424,6 +443,33 @@ resource "google_cloud_run_v2_job" "icat_pretix_cron" {
           }
         }
 
+        env {
+          name  = "PRETIX_CONFIG_VERSION"
+          value = jsonencode({
+            pretix_cfg = google_storage_bucket_object.pretix_cfg.md5hash
+          })
+        }
+
+        env {
+          name  = "PYTHONPATH"
+          value = "/pretix/src"
+        }
+
+        env {
+          name  = "DJANGO_SETTINGS_MODULE"
+          value = "production_settings"
+        }
+
+        env {
+          name  = "HOME"
+          value = "/pretix"
+        }
+
+        env {
+          name  = "DATA_DIR"
+          value = "/data/"
+        }
+
         volume_mounts {
           name       = "config-files"
           mount_path = "/etc/pretix"
@@ -470,7 +516,7 @@ resource "google_cloud_run_v2_job" "icat_pretix_cron" {
 resource "google_cloud_scheduler_job" "icat_pretix_cron_trigger" {
   name     = "icat-pretix-cron-trigger"
   region   = local.region
-  schedule = "0 * * * *"
+  schedule = "15,45 * * * *"
 
   http_target {
     http_method = "POST"
