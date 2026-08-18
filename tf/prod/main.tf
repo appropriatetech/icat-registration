@@ -6,8 +6,8 @@ locals {
   db_user = "pretix"
 
   pretix_secrets = {
-    "pretix-db-password"    = random_password.pretix_db_password.result
-    "pretix-django-secret"  = random_password.pretix_django_secret.result
+    "pretix-db-password"   = random_password.pretix_db_password.result
+    "pretix-django-secret" = random_password.pretix_django_secret.result
     "pretix-smtp-user"     = var.pretix_smtp_user
     "pretix-smtp-pass"     = var.pretix_smtp_pass
   }
