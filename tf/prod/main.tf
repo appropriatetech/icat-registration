@@ -284,6 +284,7 @@ resource "google_cloud_run_v2_service" "icat_pretix" {
     }
 
     scaling {
+      min_instance_count = 1
       max_instance_count = 4
     }
 
