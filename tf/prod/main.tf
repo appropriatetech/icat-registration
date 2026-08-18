@@ -522,7 +522,7 @@ resource "google_cloud_scheduler_job" "icat_pretix_cron_trigger" {
     http_method = "POST"
     uri         = "https://${local.region}-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/${local.project_id}/jobs/${google_cloud_run_v2_job.icat_pretix_cron.name}:run"
 
-    oidc_token {
+    oauth_token {
       service_account_email = google_service_account.pretix_sa.email
     }
   }
